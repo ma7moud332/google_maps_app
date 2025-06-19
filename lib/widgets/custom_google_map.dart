@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:google_maps_app/models/place_model.dart';
+import 'package:google_maps_app/utils/location_service.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
-import 'package:location/location.dart';
+import 'package:location_platform_interface/location_platform_interface.dart';
 
 class CustomGoogleMap extends StatefulWidget {
   const CustomGoogleMap({super.key});
@@ -12,21 +12,21 @@ class CustomGoogleMap extends StatefulWidget {
 
 class _CustomGoogleMapState extends State<CustomGoogleMap> {
   late CameraPosition initialCameraPosition;
+  late LocationService locationService;
 
-  late Location location;
   @override
   void initState() {
     initialCameraPosition = const CameraPosition(
       target: LatLng(37.7749, -122.4194), // San Francisco coordinates
       zoom: 12,
     );
-    initMarkers();
-    location = Location();
-    checkAndRequestLocationService();
+    locationService = LocationService();
+    updateMyLocation();
     super.initState();
   }
 
-  late GoogleMapController googleMapController;
+  bool isFirstCall = true;
+  GoogleMapController? googleMapController;
   Set<Marker> markers = {};
   @override
   Widget build(BuildContext context) {
@@ -34,52 +34,48 @@ class _CustomGoogleMapState extends State<CustomGoogleMap> {
       markers: markers,
       onMapCreated: (controller) {
         googleMapController = controller;
-
-        location.onLocationChanged.listen((locationData) {});
       },
       initialCameraPosition: initialCameraPosition,
     );
   }
 
-  void initMarkers() async {
-    var customMarkerIcon = await BitmapDescriptor.asset(
-      const ImageConfiguration(size: Size(50, 50)),
-      'assets/images/marker.jpg',
+  void updateMyLocation() async {
+    await locationService.checkAndRequestLocationService();
+    var hasPermission = await locationService
+        .checkAndRequestLocationPermission();
+    if (hasPermission) {
+      locationService.getRealTimeLocationData((locationData) {
+        setMyLocationMarker(locationData);
+        updateMyCamera(locationData);
+      });
+    }
+  }
+
+  void updateMyCamera(LocationData locationData) {
+    if (isFirstCall) {
+      CameraPosition cameraPosition = CameraPosition(
+        target: LatLng(locationData.latitude!, locationData.longitude!),
+        zoom: 14,
+      );
+      googleMapController?.animateCamera(
+        CameraUpdate.newCameraPosition(cameraPosition),
+      );
+      isFirstCall = false;
+    } else {
+      googleMapController?.animateCamera(
+        CameraUpdate.newLatLng(
+          LatLng(locationData.latitude!, locationData.longitude!),
+        ),
+      );
+    }
+  }
+
+  void setMyLocationMarker(LocationData locationData) {
+    var myLocationMarker = Marker(
+      markerId: const MarkerId('my_location'),
+      position: LatLng(locationData.latitude!, locationData.longitude!),
     );
-    var myMarkers = places
-        .map(
-          (placeModel) => Marker(
-            icon: customMarkerIcon,
-            markerId: MarkerId(placeModel.id.toString()),
-            position: placeModel.latlng,
-            infoWindow: InfoWindow(title: placeModel.name),
-          ),
-        )
-        .toSet();
-    markers.addAll(myMarkers);
+    markers.add(myLocationMarker);
     setState(() {});
-  }
-
-  void checkAndRequestLocationService() async {
-    var isServiceEnabled = await location.serviceEnabled();
-
-    if (!isServiceEnabled) {
-      isServiceEnabled = await location.requestService();
-      if (!isServiceEnabled) {
-        // Handle the case where the user did not enable the location service
-      }
-    }
-    checkAndRequestLocationPermission();
-  }
-
-  void checkAndRequestLocationPermission() async {
-    var permissionStatus = await location.hasPermission();
-
-    if (permissionStatus == PermissionStatus.denied) {
-      permissionStatus = await location.requestPermission();
-      if (permissionStatus != PermissionStatus.granted) {
-        // Handle the case where the user did not grant the location permission
-      }
-    }
   }
 }
