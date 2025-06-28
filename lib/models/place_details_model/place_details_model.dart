@@ -14,7 +14,7 @@ class PlaceDetailsModel {
   List<Photo>? photos;
   String? placeId;
   String? reference;
-  List<String>? types;
+  List<dynamic>? types;
   String? url;
   int? utcOffset;
   String? website;
@@ -56,7 +56,7 @@ class PlaceDetailsModel {
           .toList(),
       placeId: json['place_id'] as String?,
       reference: json['reference'] as String?,
-      types: json['types'] as List<String>?,
+      types: json['types'] as List<dynamic>?,
       url: json['url'] as String?,
       utcOffset: json['utc_offset'] as int?,
       website: json['website'] as String?,

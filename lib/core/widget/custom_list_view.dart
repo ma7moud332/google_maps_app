@@ -1,16 +1,24 @@
 import 'package:flutter/material.dart';
+import 'package:google_maps_app/core/utils/google_maps_places_service.dart';
+import 'package:google_maps_app/models/place_details_model/place_details_model.dart';
 
 import '../../models/place_autocomplete_model/place_autocomplete_model.dart';
 
 class CustomListView extends StatelessWidget {
-  const CustomListView({super.key, required this.places});
+  const CustomListView({
+    super.key,
+    required this.places,
+    required this.googleMapsPlacesService,
+    required this.onPlaceSelected,
+  });
 
   final List<PlaceAutocompleteModel> places;
+  final GoogleMapsPlacesService googleMapsPlacesService;
+  final Function(PlaceDetailsModel) onPlaceSelected;
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
@@ -22,7 +30,13 @@ class CustomListView extends StatelessWidget {
             leading: const Icon(Icons.location_on),
             title: Text(places[index].description!),
             trailing: IconButton(
-              onPressed: () {},
+              onPressed: () async {
+                var placeDetails = await googleMapsPlacesService
+                    .getPlacesDetails(
+                      placeId: places[index].placeId.toString(),
+                    );
+                onPlaceSelected(placeDetails);
+              },
               icon: const Icon(Icons.arrow_forward_ios_rounded),
             ),
           );
