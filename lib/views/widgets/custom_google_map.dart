@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:google_maps_app/core/utils/google_maps_places_service.dart';
 import 'package:google_maps_app/core/utils/location_service.dart';
@@ -26,9 +28,9 @@ class _CustomGoogleMapState extends State<CustomGoogleMap> {
   String? sessionToken;
   List<PlaceModel> places = [];
   Set<Marker> markers = {};
-  late LatLng currentLocation;
   late LatLng destination;
   Set<Polyline> polylines = {};
+  Timer? debounce;
 
   @override
   void initState() {
@@ -46,13 +48,19 @@ class _CustomGoogleMapState extends State<CustomGoogleMap> {
 
   void fetchPredictions() {
     textEditingController.addListener(() async {
+      if (debounce?.isActive ?? false) {
+        debounce!.cancel();
+      }
+
       sessionToken ??= uuid.v4();
-      await mapServices.getPredictions(
-        input: textEditingController.text,
-        sessionToken: sessionToken!,
-        places: places,
-      );
-      setState(() {});
+      debounce = Timer(const Duration(milliseconds: 100), () async {
+        await mapServices.getPredictions(
+          input: textEditingController.text,
+          sessionToken: sessionToken!,
+          places: places,
+        );
+        setState(() {});
+      });
     });
   }
 
@@ -60,6 +68,7 @@ class _CustomGoogleMapState extends State<CustomGoogleMap> {
   void dispose() {
     textEditingController.dispose();
     super.dispose();
+    debounce?.cancel();
   }
 
   @override
@@ -96,7 +105,6 @@ class _CustomGoogleMapState extends State<CustomGoogleMap> {
                   );
 
                   var poinst = await mapServices.getRouteData(
-                    currentLocation: currentLocation,
                     destination: destination,
                   );
                   mapServices.displayRoutes(
@@ -116,9 +124,12 @@ class _CustomGoogleMapState extends State<CustomGoogleMap> {
     );
   }
 
-  void updateCurrentLocation() async {
+  void updateCurrentLocation() {
     try {
-      currentLocation = await mapServices.updateCurrentLocation(
+      mapServices.updateCurrentLocation(
+        onUpdateCurrentLocation: () {
+          setState(() {});
+        },
         googleMapController: googleMapController,
         markers: markers,
       );
